@@ -18,6 +18,8 @@ namespace Program
         float lastY;
         bool firstMouse = true;
         bool isCapture = false;
+        // Изображения
+        Bitmap leftBitmap, rightBitmap;
 
         public Form1()
         {
@@ -27,6 +29,8 @@ namespace Program
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            //Изменить
+            openFileDialog1.InitialDirectory = @"//../";
         }
 
         private void glControl1_Load(object sender, EventArgs e)
@@ -154,5 +158,137 @@ namespace Program
             camera.ProcessMouseScroll(e.Delta);
         }
         #endregion
+
+        #region ImagesLoad
+        private void leftPictureBox_Click(object sender, EventArgs e)
+        {
+            if (openFileDialog1.ShowDialog() == DialogResult.Cancel)
+                return;
+            leftImageLabel.Visible = false;
+            leftPictureBox.Image = Image.FromFile(openFileDialog1.FileName);
+            leftBitmap = new Bitmap(openFileDialog1.FileName);
+            leftBitmap = CutBounds(leftBitmap);
+        }
+
+        private void rightPictureBox_Click(object sender, EventArgs e)
+        {
+            if (openFileDialog1.ShowDialog() == DialogResult.Cancel)
+                return;
+            rightImageLabel.Visible = false;
+            rightPictureBox.Image = Image.FromFile(openFileDialog1.FileName);
+            rightBitmap = new Bitmap(openFileDialog1.FileName);
+            rightBitmap = CutBounds(rightBitmap);
+        }
+
+        private Bitmap CutBounds(Bitmap bitmap)
+        {
+            int left = 0, right = bitmap.Width, up = 0, bot = bitmap.Height;
+            bool leftFlag = true, rightFlag = true, upFlag = true, botFlag = true;
+            Color backColor = bitmap.GetPixel(0, 0);
+            //Отрезаем слева и справа
+            for (int i = 0; i < bitmap.Width; i++)
+                if (!(leftFlag || rightFlag))
+                    break;
+                else
+                {
+                    for (int j = 0; j < bitmap.Height; j++)
+                    {
+                        if (!isEquaColors(bitmap.GetPixel(i, j),backColor,3))
+                            leftFlag = false;
+                        if (!isEquaColors(bitmap.GetPixel(bitmap.Width - i - 1, j),backColor,3))
+                            rightFlag = false;
+                    }
+                    if (leftFlag)
+                        left++;
+                    if (rightFlag)
+                        right--;
+                }
+            //Отрезаем сверху и снизу
+            for (int j = 0; j < bitmap.Height; j++)
+                if (!(upFlag || rightFlag))
+                    break;
+                else
+                {
+                    for (int i = 0; i < bitmap.Width; i++)
+                    {
+                        if (!isEquaColors(bitmap.GetPixel(i, j), backColor, 3))
+                            upFlag = false;
+                        if (!isEquaColors(bitmap.GetPixel(i, bitmap.Height - j - 1), backColor, 3))
+                            botFlag = false;
+                    }
+                    if (upFlag)
+                        up++;
+                    if (botFlag)
+                        bot--;
+                }
+            Bitmap result = new Bitmap(right - left + 1, bot - up + 1);
+            for (int j = up; j < bot; j++)
+                for (int i = left; i < right; i++)
+                    result.SetPixel(i - left, j - up, bitmap.GetPixel(i, j));
+            return result;
+        }
+
+        //Сравнивает цвета с пределом допустимости limit
+        private bool isEquaColors(Color color1, Color color2, int limit)
+        {
+            bool flag = true;
+            if (Math.Abs(color1.A - color2.A) > limit)
+                flag = false;
+            if (Math.Abs(color1.R - color2.R) > limit)
+                flag = false;
+            if (Math.Abs(color1.G - color2.G) > limit)
+                flag = false;
+            if (Math.Abs(color1.B - color2.B) > limit)
+                flag = false;
+            return flag;
+        }
+
+        #region picturesColor
+        //При наведении на левый Picture
+        private void leftPictureBox_MouseEnter(object sender, EventArgs e)
+        {
+            leftPictureBox.BackColor = Color.NavajoWhite;
+            leftImageLabel.BackColor = Color.NavajoWhite;
+        }
+        //При покидании области левого Picture
+        private void leftPictureBox_MouseLeave(object sender, EventArgs e)
+        {
+            leftPictureBox.BackColor = Color.Moccasin;
+            leftImageLabel.BackColor = Color.Moccasin;
+        }
+        //При наведении на правый Picture
+        private void rightPictureBox_MouseEnter(object sender, EventArgs e)
+        {
+            rightPictureBox.BackColor = Color.NavajoWhite;
+            rightImageLabel.BackColor = Color.NavajoWhite;
+        }
+
+        //При покидании области правого Picture
+        private void rightPictureBox_MouseLeave(object sender, EventArgs e)
+        {
+            rightPictureBox.BackColor = Color.Moccasin;
+            rightImageLabel.BackColor = Color.Moccasin;
+        }
+
+        private void calcButton_MouseEnter(object sender, EventArgs e)
+        {
+            calcButton.BackColor = Color.NavajoWhite;
+        }
+
+        private void calcButton_MouseLeave(object sender, EventArgs e)
+        {
+            calcButton.BackColor = Color.Moccasin;
+        }
+        #endregion
+
+        #endregion
+
+        private void calcButton_Click(object sender, EventArgs e)
+        {
+            leftPictureBox.Visible = false;
+            rightPictureBox.Visible = false;
+            calcButton.Visible = false;
+            glControl1.Visible = true;
+        }
     }
 }
