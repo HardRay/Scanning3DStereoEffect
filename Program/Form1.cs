@@ -10,8 +10,14 @@ namespace Program
 {
     public partial class Form1 : Form
     {
-        bool loaded = false;
+        struct dpoint
+        {
+            public float d;
+            public Vector3 n;
+            public int point;
+        }
 
+        bool loaded = false;
         // Камера
         Camera camera;
         float lastX;
@@ -21,6 +27,9 @@ namespace Program
         // Изображения
         Bitmap leftBitmap, rightBitmap;
 
+        List<Vector3> points; // Массив точек
+        List<Tuple<List<int>, Vector3>> polygons; // Массив полигонов
+        bool visualMode = true;
         public Form1()
         {
             InitializeComponent();
@@ -73,7 +82,7 @@ namespace Program
             //Оси
             GL.Disable(EnableCap.Lighting);
             //Ox
-            GL.Color3(Color.Blue);            
+            GL.Color3(Color.Blue);
             GL.Begin(PrimitiveType.Lines);
             GL.Vertex3(0, 0, 0);
             GL.Vertex3(1000, 0, 0);
@@ -91,7 +100,7 @@ namespace Program
             GL.End();
             GL.Color3(Color.FromArgb(180, 150, 150));
             GL.Begin(PrimitiveType.Lines);
-            GL.Vertex3(0,-1000, 0);
+            GL.Vertex3(0, -1000, 0);
             GL.Vertex3(0, 0, 0);
             GL.End();
             //Oz
@@ -106,6 +115,25 @@ namespace Program
             GL.Vertex3(0, 0, 0);
             GL.End();
             GL.Enable(EnableCap.Lighting);
+            if (visualMode)
+            {
+                GL.Begin(PrimitiveType.Points);
+                foreach (Vector3 vec in points)
+                    GL.Vertex3(vec.X, vec.Y, vec.Z);
+                GL.End();
+            }
+            else
+            {
+                foreach (Tuple<List<int>, Vector3> pair in polygons)
+                {
+                    GL.Begin(PrimitiveType.Polygon);
+                    GL.Normal3(pair.Item2.X, pair.Item2.Y, pair.Item2.Z);
+                    foreach (int i in pair.Item1)
+                        GL.Vertex3(points[i].X, points[i].Y, points[i].Z);
+                    GL.End();
+                }
+            }
+
             glControl1.SwapBuffers();
         }
 
@@ -119,6 +147,7 @@ namespace Program
                 case (Keys.S): camera.ProcessKeyboard(Camera.Camera_Movement.BACKWARD); break;
                 case (Keys.A): camera.ProcessKeyboard(Camera.Camera_Movement.LEFT); break;
                 case (Keys.D): camera.ProcessKeyboard(Camera.Camera_Movement.RIGHT); break;
+                case (Keys.M): visualMode = !visualMode; break;
                 case (Keys.Escape): Cursor.Show(); isCapture = false; Cursor.Clip = Screen.PrimaryScreen.Bounds; break;
             }
             glControl1.Invalidate();
@@ -228,21 +257,6 @@ namespace Program
             return result;
         }
 
-        //Сравнивает цвета с пределом допустимости limit
-        private bool isEquaColors(Color color1, Color color2, int limit)
-        {
-            bool flag = true;
-            if (Math.Abs(color1.A - color2.A) > limit)
-                flag = false;
-            if (Math.Abs(color1.R - color2.R) > limit)
-                flag = false;
-            if (Math.Abs(color1.G - color2.G) > limit)
-                flag = false;
-            if (Math.Abs(color1.B - color2.B) > limit)
-                flag = false;
-            return flag;
-        }
-
         #region picturesColor
         //При наведении на левый Picture
         private void leftPictureBox_MouseEnter(object sender, EventArgs e)
@@ -285,10 +299,141 @@ namespace Program
 
         private void calcButton_Click(object sender, EventArgs e)
         {
+            calcDepthMap(numericUpDown1.Value, numericUpDown2.Value);
             leftPictureBox.Visible = false;
             rightPictureBox.Visible = false;
             calcButton.Visible = false;
+            label1.Visible = false;
+            label2.Visible = false;
+            numericUpDown1.Visible = false;
+            numericUpDown2.Visible = false;
             glControl1.Visible = true;
+            button1.Visible = true;
+        }
+
+        //Рассчёт карты глубины
+        private void calcDepthMap(decimal f,decimal b)
+        {
+            points = new List<Vector3>();
+            polygons = new List<Tuple<List<int>, Vector3>>();
+            Color backColor = leftBitmap.GetPixel(0, 0); // Исправить
+            int width = Math.Max(leftBitmap.Width, rightBitmap.Width);
+            dpoint[,] Data = new dpoint[leftBitmap.Height, width];
+            for (int i = 0; i < leftBitmap.Height; i++)
+                for (int j = 0; j < width; j++)
+                {
+                    Data[i, j].point = -1;
+                }
+            for (int y = 0; y < leftBitmap.Height; y++)
+            {
+                for (int leftX = 0; leftX < leftBitmap.Width; leftX++)
+                {
+                    if (isEquaColors(leftBitmap.GetPixel(leftX, y), backColor, 3))
+                        continue;
+                    int maxOffset = 30;
+                    //Поиск парного пикселя на правом снимке
+                    int from = Math.Max(0, leftX - maxOffset); //Левая граница поиска
+                    int before = Math.Min(leftBitmap.Width, leftX + maxOffset); //Правая граница поиска
+                    float deviation = 255;
+                    int pairX = leftX;
+                    for (int rightX = from; rightX < before; rightX++)
+                    {
+                        float sum = 0;
+                        int count = 0;
+                        for (int i = -1; i <= 1; i++)
+                            if ((y + i >= 0) && (y + i < leftBitmap.Height) && (y + i < rightBitmap.Height))
+                                for (int j = -1; j <= 1; j++)
+                                    if ((leftX + j >= 0) && (leftX + j < leftBitmap.Width) && (rightX + j >= 0) && (rightX + j < rightBitmap.Width))
+                                    {
+                                        sum += SubColors(leftBitmap.GetPixel(leftX + j, y + i), rightBitmap.GetPixel(rightX + j, y + i));
+                                        count++;
+                                    }
+                        float newDeviation = (sum / count);
+                        if (newDeviation < deviation)
+                        {
+                            deviation = newDeviation;
+                            pairX = rightX;
+                        }
+                    }
+                    //Рассчёт глубины
+                    if (leftX != pairX)
+                    {
+                        float z = (float)f * (float)b / (pairX - leftX);
+                        int x = leftX;
+                        points.Add(new Vector3(x, y, z));
+                        Data[y, x].d = z;
+                        Data[y, x].point = points.Count - 1;
+                    }
+                    
+                }
+            }
+            MessageBox.Show("hi!");
+            // построение полигонов
+            float Qz, Pz;
+            for (int i = 1; i < leftBitmap.Height - 2; i++)
+                for (int j = 1; j < width - 2; j++)
+                    if (Data[i, j].point != -1 && Data[i + 1, j + 1].point != -1)
+                    {
+                        // если есть "левый" треугольник
+                        if (Data[i + 1, j].point != -1)
+                        {
+                            Qz = Data[i + 1, j].d - Data[i, j].d;
+                            Pz = Data[i + 1, j + 1].d - Data[i, j].d;
+                            Vector3 N = new Vector3(Pz - Qz, Qz, 1);
+                            List<int> ind1 = new List<int>();
+                            ind1.Add(Data[i, j].point);
+                            ind1.Add(Data[i + 1, j].point);
+                            ind1.Add(ind1[1] + 1);
+                            polygons.Add(new Tuple<List<int>, Vector3>(ind1, N));
+                        }
+                        // если есть "правый" треугольник
+                        if (Data[i, j + 1].point != -1)
+                        {
+                            Qz = Data[i, j + 1].d - Data[i, j].d;
+                            Pz = Data[i + 1, j + 1].d - Data[i, j].d;
+                            Vector3 N = new Vector3(Qz, Qz - Pz, 1);
+                            List<int> ind2 = new List<int>();
+                            ind2.Add(Data[i, j].point);
+                            ind2.Add(Data[i + 1, j + 1].point);
+                            ind2.Add(ind2[0] + 1);
+                            polygons.Add(new Tuple<List<int>, Vector3>(ind2, N));
+                        }
+                    }
+        }
+
+        //Находит условную разность между цветами
+        private float SubColors(Color color1, Color color2)
+        {
+            int sub = Math.Abs(color1.A - color2.A);
+            sub += Math.Abs(color1.R - color2.R);
+            sub += Math.Abs(color1.G - color2.G);
+            sub += Math.Abs(color1.B - color2.B);
+            return (sub / 4);
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            glControl1.Visible = false;
+            button1.Visible = false;
+            leftPictureBox.Visible = true;
+            rightPictureBox.Visible = true;
+            calcButton.Visible = true;
+            label1.Visible = true;
+            label2.Visible = true;
+            numericUpDown1.Visible = true;
+            numericUpDown2.Visible = true;
+        }
+
+        //Сравнивает цвета с пределом допустимости limit
+        private bool isEquaColors(Color color1, Color color2, int limit)
+        {
+            if (Math.Abs(color1.R - color2.R) > limit)
+                return false;
+            if (Math.Abs(color1.G - color2.G) > limit)
+                return false;
+            if (Math.Abs(color1.B - color2.B) > limit)
+                return false;
+            return true;
         }
     }
 }
