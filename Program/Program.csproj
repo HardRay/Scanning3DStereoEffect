@@ -80,6 +80,7 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StereoEffect.cs" />
     <EmbeddedResource Include="CalculationForm.resx">
       <DependentUpon>CalculationForm.cs</DependentUpon>
     </EmbeddedResource>

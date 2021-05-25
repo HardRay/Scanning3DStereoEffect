@@ -142,11 +142,12 @@
             // 
             // numericUpDown1
             // 
+            this.numericUpDown1.DecimalPlaces = 2;
             this.numericUpDown1.Increment = new decimal(new int[] {
             1,
             0,
             0,
-            65536});
+            131072});
             this.numericUpDown1.Location = new System.Drawing.Point(394, 423);
             this.numericUpDown1.Maximum = new decimal(new int[] {
             10,
@@ -158,23 +159,24 @@
             this.numericUpDown1.TabIndex = 7;
             this.numericUpDown1.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.numericUpDown1.Value = new decimal(new int[] {
-            1,
+            5,
             0,
             0,
-            0});
+            131072});
             // 
             // numericUpDown2
             // 
+            this.numericUpDown2.DecimalPlaces = 2;
             this.numericUpDown2.Location = new System.Drawing.Point(723, 423);
             this.numericUpDown2.Name = "numericUpDown2";
             this.numericUpDown2.Size = new System.Drawing.Size(78, 20);
             this.numericUpDown2.TabIndex = 9;
             this.numericUpDown2.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.numericUpDown2.Value = new decimal(new int[] {
-            5,
+            11,
             0,
             0,
-            0});
+            131072});
             // 
             // label2
             // 
